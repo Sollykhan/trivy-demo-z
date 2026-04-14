@@ -1,20 +1,54 @@
-# Base image - using a specific version for reproducibility
-FROM python:3.9-slim
+name: Security Scan with Trivy
 
-# Set working directory
-WORKDIR /app
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
-# Copy requirements first to leverage Docker cache
-COPY requirements.txt .
+permissions:
+  contents: read
+  security-events: write
 
-# Install dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+jobs:
+  trivy-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-# Copy application code
-COPY . .
+      - name: Run Trivy vulnerability scanner in filesystem mode
+        uses: aquasecurity/trivy-action@aeb13962e8044961d8758c86772280caa8f179ee
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'table'
+          severity: 'CRITICAL,HIGH'
 
-# Expose the port the app runs on
-EXPOSE 5000
-
-# Run the application
-CMD ["python", "app.py"]
+      - name: Build an image from Dockerfile
+        run: |
+          docker build -t my-python-app:${{ github.sha }} .
+          
+      - name: Run Trivy vulnerability scanner in image mode
+        uses: aquasecurity/trivy-action@aeb13962e8044961d8758c86772280caa8f179ee
+        with:
+          image-ref: 'my-python-app:${{ github.sha }}'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+          
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results.sarif'
+:thumbsup:
+Clique pour réagir
+:white_check_mark:
+Clique pour réagir
+:fire:
+Clique pour réagir
+Ajouter une réaction
+Répondre
+Transférer
+Plus
+[11:34]mardi 14 avril 2026 11:34
